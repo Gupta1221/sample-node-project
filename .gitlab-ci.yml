@@ -27,7 +27,7 @@ buildX:
     paths:
       - sample-node-project/sample-node-app.tar  # Ensure the path is relative to the working directory
   dependencies:
-    - buildY  # Specify the job that this job depends on for artifacts
+    - buildY  # Specify the job that this job depends on for startinh execution
   when: on_success
 
 # BuildY job for all branches and tags
