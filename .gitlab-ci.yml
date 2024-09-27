@@ -1,0 +1,76 @@
+# Define the stages
+stages:
+  - build
+  - scan
+  - deploy
+
+# Build stage with buildX job for master branch and schedule triggers
+buildX:
+  stage: build
+  image: docker:20.10  # Use Docker image
+  services:
+    - docker:dind  # Enable Docker in Docker
+  variables:
+    DOCKER_DRIVER: overlay2
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'  # Triggered by a schedule
+    - if: '$CI_COMMIT_REF_NAME == "master"'    # Runs only on master branch
+  script:
+    - apk add --no-cache git  # Install git
+    - git clone https://github.com/acemilyalcin/sample-node-project.git
+    - cd sample-node-project
+    - docker build -t sample-node-app .
+    - docker images  # Check if the Docker image is built successfully
+    - docker save -o sample-node-app.tar sample-node-app
+    - ls -al  # Verify the tar file is created
+  artifacts:
+    paths:
+      - sample-node-project/sample-node-app.tar  # Ensure the path is relative to the working directory
+  dependencies:
+    - buildY  # Specify the job that this job depends on for artifacts
+  when: on_success
+
+# BuildY job for all branches and tags
+buildY:
+  stage: build
+  script:
+    - echo "Running buildY for all branches and tags"
+    - |
+      # Shell script to compare two strings
+      str1="hello"
+      str2="world"
+      if [ "$str1" = "$str2" ]; then
+        echo "Strings are equal"
+      else
+        echo "Strings are not equal"
+      fi
+#  tags:
+#   - linux-east-us
+#checkk
+
+# Scan stage for npm linting
+scan:
+  stage: scan
+  image: node:14  # Use Node.js image
+  rules:
+  - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    when: always
+  script:
+    - git clone https://github.com/acemilyalcin/sample-node-project.git
+    - cd sample-node-project
+    - npm install
+    - npm run lint  # Run linting (you need to have a lint script in package.json)
+  allow_failure: false
+
+# Deploy stage to list artifact contents, triggered manually
+deploy:
+  stage: deploy
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'  # Triggered by a schedule
+    - if: '$CI_COMMIT_REF_NAME == "master"'    # Runs only on master branch
+  script:
+    - echo "Listing the contents of the Docker image artifact"
+    - ls -al sample-node-project/sample-node-app.tar
+  when: manual
+  dependencies:
+    - buildX  # Depends on successful completion of buildX
